@@ -1,0 +1,59 @@
+
+services:
+  mongo:
+    image: mongo:noble
+    container_name: mongo
+    restart: always
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - myNetwork
+
+  mongo-init-replica:
+    image: mongo:noble
+    depends_on:
+      - mongo
+    restart: "no"
+    entrypoint: ["sh", "-c", "sleep 5 && mongosh --host mongo:27017 --eval 'rs.initiate({_id:\"rs0\", members:[{_id:0, host:\"mongo:27017\"}]})'"]
+    networks:
+      - myNetwork
+
+  app:
+    build: .
+    container_name: app
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URI=${MONGO_URI}
+    networks:
+      - myNetwork
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_MONGODB_ENABLE_ADMIN=true
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin
+    depends_on:
+      - mongo
+    networks:
+      - myNetwork
+
+volumes:
+  mongo-data:
+
+networks:
+  myNetwork:
+    driver: bridge
